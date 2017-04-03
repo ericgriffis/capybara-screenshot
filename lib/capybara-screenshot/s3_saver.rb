@@ -5,10 +5,11 @@ module Capybara
     class S3Saver
       DEFAULT_REGION = 'us-east-1'
 
-      def initialize(saver, s3_client, bucket_name)
+      def initialize(saver, s3_client, bucket_name, key_prefix: nil)
         @saver = saver
         @s3_client = s3_client
         @bucket_name = bucket_name
+        @key_prefix = key_prefix
       end
 
       def self.new_with_configuration(saver, configuration)
@@ -17,13 +18,13 @@ module Capybara
         }
 
         s3_client_credentials = default_s3_client_credentials.merge(
-          configuration.fetch(:s3_client_credentials)
+          configuration.delete(:s3_client_credentials)
         )
 
         s3_client = Aws::S3::Client.new(s3_client_credentials)
-        bucket_name = configuration.fetch(:bucket_name)
+        bucket_name = configuration.delete(:bucket_name)
 
-        new(saver, s3_client, bucket_name)
+        new(saver, s3_client, bucket_name, **configuration)
       rescue KeyError
         raise "Invalid S3 Configuration #{configuration}. Please refer to the documentation for the necessary configurations."
       end
@@ -33,7 +34,7 @@ module Capybara
           File.open(local_file_path) do |file|
             s3_client.put_object(
                 bucket: bucket_name,
-                key: File.basename(local_file_path),
+                key: "#{key_prefix}#{File.basename(local_file_path)}",
                 body: file
             )
           end
@@ -51,7 +52,8 @@ module Capybara
       private
       attr_reader :saver,
                   :s3_client,
-                  :bucket_name
+                  :bucket_name,
+                  :key_prefix
 
       def save_and
         saver.save
